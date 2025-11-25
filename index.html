@@ -210,7 +210,17 @@ body[data-dash="editor"] #dashboard {
 
 <div id="audio-player">
     <strong>Music Playlist</strong><br>
-    <audio id="bgm" controls></audio><br>
+
+    <!-- Audio element -->
+    <audio id="bgm" controls></audio><br><br>
+
+    <!-- Upload audio files -->
+    <input type="file" id="music-upload" accept="audio/*" multiple><br><br>
+
+    <!-- Track list -->
+    <div id="track-list" style="max-height:150px; overflow-y:auto;"></div>
+
+    <button onclick="prevTrack()">Prev Track</button>
     <button onclick="nextTrack()">Next Track</button>
 </div>
 
@@ -380,14 +390,77 @@ document.getElementById('files').onchange = e=>{
     });
 };
 
-/* ============= AUDIO PLAYLIST ====================== */
-function nextTrack() {
-    if (musicList.length===0) return;
-    trackIndex = (trackIndex+1)%musicList.length;
-    document.getElementById('bgm').src = musicList[trackIndex];
+/* ============================================================
+   MUSIC PLAYLIST ENGINE — (Phase 2 Ultra Upgrade)
+============================================================ */
+
+let musicList = [];
+let trackIndex = 0;
+
+/* Update track list visually */
+function refreshTrackList() {
+    const list = document.getElementById("track-list");
+    list.innerHTML = "";
+
+    musicList.forEach((track, i) => {
+        const div = document.createElement("div");
+        div.style.padding = "5px";
+        div.style.cursor = "pointer";
+        div.style.background = i === trackIndex ? "rgba(255,255,0,0.2)" : "transparent";
+
+        div.innerText = (i+1) + ". " + track.name;
+        div.onclick = () => {
+            trackIndex = i;
+            playCurrentTrack();
+        };
+
+        list.appendChild(div);
+    });
 }
 
-document.getElementById('bgm').onended = nextTrack;
+/* Load and play the current track */
+function playCurrentTrack() {
+    const audio = document.getElementById("bgm");
+    if (musicList.length === 0) return;
+
+    audio.src = musicList[trackIndex].url;
+    audio.play();
+    refreshTrackList();
+}
+
+/* Next track */
+function nextTrack() {
+    if (musicList.length === 0) return;
+    trackIndex = (trackIndex + 1) % musicList.length;
+    playCurrentTrack();
+}
+
+/* Previous track */
+function prevTrack() {
+    if (musicList.length === 0) return;
+    trackIndex = (trackIndex - 1 + musicList.length) % musicList.length;
+    playCurrentTrack();
+}
+
+/* Auto-next when a track ends */
+document.getElementById("bgm").onended = nextTrack;
+
+/* Upload music files */
+document.getElementById("music-upload").onchange = (e) => {
+    [...e.target.files].forEach(file => {
+        if (file.type.startsWith("audio/")) {
+            const url = URL.createObjectURL(file);
+            musicList.push({ name: file.name, url });
+        }
+    });
+
+    refreshTrackList();
+
+    // Auto-play first track if none playing
+    if (musicList.length === 1) {
+        playCurrentTrack();
+    }
+};
 
 /* ======= Basic Left/Right Navigation =============== */
 document.onkeydown = e=>{
