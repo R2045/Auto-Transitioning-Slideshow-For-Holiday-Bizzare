@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ultimate Slideshow App</title>
+
+<style>
+/* -------------------------------------------------------
+   BASE STYLES
+------------------------------------------------------- */
+body {
+    margin: 0;
+    background: #111;
+    height: 100vh;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    color: white;
+    --transition-speed: 1s;
+    --object-fit: contain;
+}
+
+/* THEMES ------------------------------------------------ */
+
+body.theme-light { background: #fafafa; color: #000; }
+body.theme-glass {
+    background: url('https://images.unsplash.com/photo-1520880867055-1e30d1cb001c?auto=format&w=1200') center/cover no-repeat;
+    backdrop-filter: blur(10px);
+}
+body.theme-neon {
+    background: #000;
+    color: #0ff;
+    text-shadow: 0 0 10px #0ff;
+}
+
+/* -------------------------------------------------------
+   SLIDESHOW
+------------------------------------------------------- */
+#slideshow {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+}
+
+.slide {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity var(--transition-speed) ease-in-out;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.slide.active { opacity: 1; }
+
+.slide img,
+.slide iframe,
+.slide video {
+    width: 100%;
+    height: 100%;
+    object-fit: var(--object-fit);
+    border: none;
+}
+
+/* CAPTION */
+.caption {
+    position: absolute;
+    bottom: 15px;
+    width: 100%;
+    text-align: center;
+    font-size: 1.3em;
+    background: rgba(0,0,0,0.4);
+    padding: 5px 0;
+    cursor: pointer;
+}
+
+/* EDITABLE CAPTION MODE */
+.edit-caption {
+    border: 2px solid yellow;
+    background: rgba(0,0,0,0.7);
+}
+
+/* CONTROLS ------------------------------------------------ */
+#controls {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 20;
+    display: flex;
+    gap: 10px;
+}
+
+button {
+    padding: 10px 15px;
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+}
+button:hover { background: rgba(255,255,255,0.25); }
+
+/* UPLOAD AREA ------------------------------------------- */
+#upload-box {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    padding: 15px;
+    border: 2px dashed #666;
+    text-align: center;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.05);
+    z-index: 999;
+    cursor: pointer;
+}
+
+/* THUMBNAIL GALLERY ------------------------------------- */
+#gallery {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 160px;
+    height: 100vh;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.5);
+    padding: 10px;
+    z-index: 15;
+}
+
+.thumb {
+    width: 100%;
+    height: 100px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+.thumb.active { border-color: yellow; }
+
+/* ADMIN MODE -------------------------------------------- */
+#admin-panel {
+    position: absolute;
+    top: 60px;
+    left: 10px;
+    background: rgba(0,0,0,0.7);
+    padding: 15px;
+    border-radius: 10px;
+    display: none;
+}
+
+#admin-panel input {
+    margin-bottom: 5px;
+}
+</style>
+</head>
+<body class="theme-dark">
+
+<div id="slideshow"></div>
+
+<!-- CONTROLS -->
+<div id="controls">
+    <button onclick="prevSlide()">⟨ Prev</button>
+    <button onclick="nextSlide()">Next ⟩</button>
+    <button onclick="toggleFullscreen()">⤢ Fullscreen</button>
+    <button onclick="shuffleSlides()">Shuffle</button>
+    <button onclick="toggleTheme()">Theme</button>
+    <button onclick="toggleAdmin()">Admin</button>
+    <button onclick="exportSlides()">Export</button>
+    <button onclick="importSlides()">Import</button>
+</div>
+
+<!-- ADMIN PANEL -->
+<div id="admin-panel">
+    <label>Password:</label><br>
+    <input type="password" id="admin-pass"><br>
+    <button onclick="loginAdmin()">Unlock</button>
+    <hr>
+    <label>Object Fit:</label>
+    <select onchange="changeObjectFit(this.value)">
+        <option value="contain">Contain</option>
+        <option value="cover">Cover</option>
+    </select><br><br>
+
+    <label>Transition Speed (ms):</label><br>
+    <input type="number" value="1000" onchange="changeSpeed(this.value)"><br>
+</div>
+
+<!-- GALLERY -->
+<div id="gallery"></div>
+
+<!-- UPLOAD BOX -->
+<div id="upload-box">
+    <strong>Click or Drop Files Here</strong><br>
+    Images • Videos • txt with embed links
+    <input type="file" id="file-input" multiple style="display:none;">
+</div>
+
+<script>
+/* =====================================================================================
+   CORE SLIDESHOW LOGIC
+===================================================================================== */
+
+let slides = [];
+let current = 0;
+let autoAdvance = true;
+let playingMusic = null;
+let isAdmin = false;
+
+const showSlide = index => {
+    current = index % slides.length;
+    if (current < 0) current = slides.length - 1;
+
+    document.querySelectorAll('.slide').forEach((el, i) => {
+        el.classList.toggle('active', i === current);
+    });
+
+    document.querySelectorAll('.thumb').forEach((el, i) => {
+        el.classList.toggle('active', i === current);
+    });
+};
+
+const nextSlide = () => showSlide(current + 1);
+const prevSlide = () => showSlide(current - 1);
+
+setInterval(() => {
+    if (autoAdvance && slides.length > 1) nextSlide();
+}, 5000);
+
+/* =====================================================================================
+   SLIDE CREATION
+===================================================================================== */
+
+function addSlide(type, src, caption = '') {
+    const container = document.getElementById("slideshow");
+
+    const slide = document.createElement("div");
+    slide.className = "slide";
+
+    let el;
+    if (type === "img") {
+        el = document.createElement("img");
+        el.src = src;
+    }
+    if (type === "video") {
+        el = document.createElement("video");
+        el.src = src;
+        el.autoplay = true;
+        el.loop = true;
+        el.muted = true;
+    }
+    if (type === "iframe") {
+        el = document.createElement("iframe");
+        el.src = src;
+        el.allowFullscreen = true;
+    }
+
+    const cap = document.createElement("div");
+    cap.className = "caption";
+    cap.textContent = caption || "Click to edit caption";
+    cap.onclick = () => editCaption(cap);
+
+    slide.appendChild(el);
+    slide.appendChild(cap);
+    container.appendChild(slide);
+
+    slides.push({type, src, caption});
+    addThumbnail(src);
+    showSlide(slides.length - 1);
+    saveToLocal();
+}
+
+function addThumbnail(src) {
+    const gallery = document.getElementById("gallery");
+    const div = document.createElement("div");
+    div.className = "thumb";
+
+    div.onclick = () => showSlide([...gallery.children].indexOf(div));
+
+    const img = document.createElement("img");
+    img.src = src;
+    img.style.width = "100%";
+    img.style.height = "100%";
+    img.style.objectFit = "cover";
+
+    div.appendChild(img);
+    gallery.appendChild(div);
+}
+
+/* =====================================================================================
+   CAPTION EDITING
+===================================================================================== */
+function editCaption(el) {
+    if (!isAdmin) return;
+    el.contentEditable = true;
+    el.classList.add("edit-caption");
+    el.onblur = () => {
+        el.contentEditable = false;
+        el.classList.remove("edit-caption");
+        const index = current;
+        slides[index].caption = el.textContent;
+        saveToLocal();
+    };
+}
+
+/* =====================================================================================
+   THEMES
+===================================================================================== */
+
+let themes = ["theme-dark","theme-light","theme-glass","theme-neon"];
+let themeIndex = 0;
+
+function toggleTheme() {
+    themeIndex = (themeIndex + 1) % themes.length;
+    document.body.className = themes[themeIndex];
+}
+
+/* =====================================================================================
+   ADMIN MODE
+===================================================================================== */
+
+function toggleAdmin() {
+    document.getElementById("admin-panel").style.display =
+        document.getElementById("admin-panel").style.display === "none" ? "block" : "none";
+}
+
+function loginAdmin() {
+    const pass = document.getElementById("admin-pass").value;
+    if (pass === "admin") {
+        alert("Admin unlocked");
+        isAdmin = true;
+    } else {
+        alert("Incorrect password");
+    }
+}
+
+/* =====================================================================================
+   SETTINGS
+===================================================================================== */
+
+function changeObjectFit(val) {
+    document.body.style.setProperty("--object-fit", val);
+    saveToLocal();
+}
+
+function changeSpeed(ms) {
+    document.body.style.setProperty("--transition-speed", ms + "ms");
+    saveToLocal();
+}
+
+/* =====================================================================================
+   IMPORT / EXPORT
+===================================================================================== */
+
+function exportSlides() {
+    const data = JSON.stringify(slides);
+    const blob = new Blob([data], {type: "application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "slideshow.json";
+    a.click();
+}
+
+function importSlides() {
+    const i = document.createElement("input");
+    i.type = "file";
+    i.accept = ".json";
+    i.onchange = e => {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = ev => {
+            const data = JSON.parse(ev.target.result);
+            data.forEach(s => addSlide(s.type, s.src, s.caption));
+            saveToLocal();
+        };
+        reader.readAsText(file);
+    };
+    i.click();
+}
+
+/* =====================================================================================
+   SAVING TO LOCAL STORAGE
+===================================================================================== */
+
+function saveToLocal() {
+    localStorage.setItem("slides", JSON.stringify(slides));
+}
+
+function loadFromLocal() {
+    const data = localStorage.getItem("slides");
+    if (!data) return;
+    JSON.parse(data).forEach(s => addSlide(s.type, s.src, s.caption));
+}
+
+/* =====================================================================================
+   FILE UPLOAD (drag & drop + click)
+===================================================================================== */
+
+const uploadBox = document.getElementById("upload-box");
+const fileInput = document.getElementById("file-input");
+
+uploadBox.onclick = () => fileInput.click();
+
+fileInput.onchange = () => handleFiles(fileInput.files);
+
+uploadBox.ondragover = e => { e.preventDefault(); };
+uploadBox.ondrop = e => {
+    e.preventDefault();
+    handleFiles(e.dataTransfer.files);
+};
+
+function handleFiles(files) {
+    [...files].forEach(file => {
+        let url = URL.createObjectURL(file);
+
+        if (file.type.startsWith("image/")) addSlide("img", url, file.name);
+        if (file.type.startsWith("video/")) addSlide("video", url, file.name);
+        if (file.type === "text/plain") {
+            const r = new FileReader();
+            r.onload = ev => {
+                ev.target.result.split("\n").forEach(line=>{
+                    if (line.trim()) addSlide("iframe", line.trim());
+                });
+            };
+            r.readAsText(file);
+        }
+    });
+}
+
+/* =====================================================================================
+   FULLSCREEN
+===================================================================================== */
+
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+/* =====================================================================================
+   INIT
+===================================================================================== */
+loadFromLocal();
+</script>
+
+</body>
+</html>
