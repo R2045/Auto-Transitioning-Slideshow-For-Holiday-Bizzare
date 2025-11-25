@@ -163,6 +163,24 @@ body[data-dash="editor"] #dashboard {
     left: 0; top: 0; bottom: 0;
     width: 30vw; border-radius: 0;
 }
+    
+<h3>Add Embeds / Links</h3>
+<textarea id="embed-input" placeholder="Paste embed code, URL, YouTube link, etc." 
+style="width:100%; height:80px;"></textarea>
+<button onclick="addEmbed()">Add Embed</button>
+<br><br>
+
+    <h3>Upload Media</h3>
+<!-- Images and Videos -->
+<input type="file" id="media-upload" multiple accept="image/*,video/*"><br><br>
+
+<!-- Audio Upload -->
+<input type="file" id="music-upload" multiple accept="audio/*"><br><br>
+
+<!-- Embeds / Links -->
+<textarea id="embed-input" placeholder="Paste embed code, URL, YouTube link, etc." 
+style="width:100%; height:80px;"></textarea>
+<button onclick="addEmbed()">Add Embed</button><br><br>
 
 /* ============= TIMELINE =========================== */
 #timeline {
@@ -310,37 +328,43 @@ function setDashboardMode(mode) {
 
 /* ============= CREATE SLIDE ======================= */
 function createSlide(type, src, caption="", desc="") {
-    const s = document.createElement('div');
+    const s = document.createElement("div");
     s.className = "slide";
 
     let el;
-    if (type==="img") {
-        el = document.createElement('img');
+    if(type==="img") {
+        el = document.createElement("img");
         el.src = src;
-    }
-    if (type==="video") {
-        el = document.createElement('video');
-        el.src = src; el.autoplay=true; el.loop=true; el.muted=true;
-    }
-    if (type==="iframe") {
-        el = document.createElement('iframe');
-        el.src = src; el.allowFullscreen = true;
+    } else if(type==="video") {
+        el = document.createElement("video");
+        el.src = src; 
+        el.autoplay=true; 
+        el.loop=true; 
+        el.muted=true; 
+        el.controls=true;
     }
 
     s.appendChild(el);
-    document.getElementById('slideshow').appendChild(s);
+    document.getElementById("slideshow").appendChild(s);
 
-    slides.push({type,src,caption,desc});
+    slides.push({ type, src, caption, desc });
     addTimelineThumb(src);
 
-    if (slides.length===1) showSlide(0);
+    if(slides.length===1) showSlide(0);
 }
 
 /* ============= TIMELINE =========================== */
 function addTimelineThumb(src) {
-    const t = document.createElement('div');
+    const t = document.createElement("div");
     t.className = "timeline-item";
-    t.innerHTML = `<img src="${src}">`;
+
+    // For images, show thumbnail; for video/other, use placeholder
+    if(src.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+        t.innerHTML = `<img src="${src}">`;
+    } else {
+        t.innerHTML = `<div style="background:#444;color:white;font-size:10px;text-align:center;padding-top:20px;">Media</div>`;
+    }
+
     t.onclick = ()=>showSlide([...t.parentNode.children].indexOf(t));
     document.getElementById('timeline').appendChild(t);
 }
@@ -390,7 +414,27 @@ document.getElementById('files').onchange = e=>{
     });
 };
 
-/* ============================================================
+    if (file.type.startsWith("video")) {
+    let url = URL.createObjectURL(file);
+    createSlide("video", url, file.name);
+}
+
+/* ============= AUDIO PLAYLIST ====================== */
+function nextTrack() {
+    if (musicList.length===0) return;
+    trackIndex = (trackIndex+1)%musicList.length;
+    document.getElementById('bgm').src = musicList[trackIndex];
+}
+
+document.getElementById('bgm').onended = nextTrack;
+
+/* ======= Basic Left/Right Navigation =============== */
+document.onkeydown = e=>{
+    if (e.key==="ArrowRight") showSlide(current+1);
+    if (e.key==="ArrowLeft") showSlide(current-1);
+};
+
+    /* ============================================================
    MUSIC PLAYLIST ENGINE — (Phase 2 Ultra Upgrade)
 ============================================================ */
 
@@ -462,10 +506,117 @@ document.getElementById("music-upload").onchange = (e) => {
     }
 };
 
-/* ======= Basic Left/Right Navigation =============== */
-document.onkeydown = e=>{
-    if (e.key==="ArrowRight") showSlide(current+1);
-    if (e.key==="ArrowLeft") showSlide(current-1);
+    /* ============================================================
+   EMBEDS + LINK PREVIEW + VIDEO LINK ENGINE
+============================================================ */
+
+function addEmbed() {
+    const raw = document.getElementById("embed-input").value.trim();
+    if (!raw) return;
+
+    // CASE 1 — Raw embed code (iframe, script, HTML blocks)
+    if (raw.startsWith("<")) {
+        createEmbedSlide(raw, "Custom Embed");
+        document.getElementById("embed-input").value = "";
+        return;
+    }
+
+    // CASE 2 — YouTube Link
+    if (raw.includes("youtube.com") || raw.includes("youtu.be")) {
+        const id = extractYouTubeID(raw);
+        if (id) {
+            createEmbedSlide(
+                `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${id}" frameborder="0" allowfullscreen></iframe>`,
+                "YouTube"
+            );
+            document.getElementById("embed-input").value = "";
+            return;
+        }
+    }
+
+    // CASE 3 — Vimeo Link
+    if (raw.includes("vimeo.com")) {
+        const id = raw.split("/").pop();
+        createEmbedSlide(
+            `<iframe src="https://player.vimeo.com/video/${id}" frameborder="0" allowfullscreen></iframe>`,
+            "Vimeo"
+        );
+        document.getElementById("embed-input").value = "";
+        return;
+    }
+
+    // CASE 4 — Video File URL
+    if (raw.match(/\.(mp4|webm|ogg|mov)$/i)) {
+        createSlide("video", raw, "Video Link");
+        document.getElementById("embed-input").value = "";
+        return;
+    }
+
+    // CASE 5 — Generic Website URL → Auto Link Preview
+    createLinkPreviewSlide(raw);
+    document.getElementById("embed-input").value = "";
+}
+    
+/* Extract YouTube Video ID */
+function extractYouTubeID(url) {
+    let id = null;
+
+    if (url.includes("youtu.be/"))
+        id = url.split("youtu.be/")[1].split(/[?&]/)[0];
+
+    if (url.includes("watch?v="))
+        id = url.split("watch?v=")[1].split("&")[0];
+
+    return id;
+}
+
+/* Create a raw embed slide */
+function createEmbedSlide(html, caption="Embed") {
+    const s = document.createElement("div");
+    s.className = "slide";
+    s.innerHTML = html;
+
+    document.getElementById("slideshow").appendChild(s);
+    slides.push({ type:"embed", html, caption, desc:"" });
+
+    addTimelineThumbFromHTML(html);
+    if (slides.length===1) showSlide(0);
+}
+
+/* Create a link preview slide */
+function createLinkPreviewSlide(url) {
+    const previewHTML = `
+        <div style="width:100%; height:100%; background:#222; display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; padding:20px;">
+            <h2>Preview: ${url}</h2>
+            <iframe src="${url}" style="flex:1; width:90%; border:0;"></iframe>
+        </div>
+    `;
+    createEmbedSlide(previewHTML, "Link Preview");
+}
+
+/* Thumbnail for non-image items */
+function addTimelineThumbFromHTML(html) {
+    const t = document.createElement("div");
+    t.className = "timeline-item";
+    t.innerHTML = `<div style="background:#444; color:white; font-size:10px; text-align:center; padding-top:20px;">Embed</div>`;
+    t.onclick = ()=>showSlide([...t.parentNode.children].indexOf(t));
+    document.getElementById('timeline').appendChild(t);
+}
+
+    /* ============================================================
+   MEDIA UPLOAD HANDLER — Images + Videos + Embeds
+============================================================ */
+
+document.getElementById("media-upload").onchange = function(e){
+    const files = [...e.target.files];
+    files.forEach(file => {
+        const url = URL.createObjectURL(file);
+        if(file.type.startsWith("image/")) {
+            createSlide("img", url, file.name);
+        } else if(file.type.startsWith("video/")) {
+            createSlide("video", url, file.name);
+        }
+    });
 };
 
 </script>
