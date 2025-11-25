@@ -2,451 +2,399 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<title>Ultra Slideshow App — Phase 2</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Ultimate Slideshow App</title>
-
 <style>
-/* -------------------------------------------------------
-   BASE STYLES
-------------------------------------------------------- */
+
+/* =============== GLOBAL VARIABLES ================= */
+:root {
+    --trans-speed: 1s;
+    --fit: contain;
+    --dash-mode: floating; /* floating | side | dock | editor */
+}
+
+/* =============== GLOBAL RESET ==================== */
 body {
     margin: 0;
-    background: #111;
-    height: 100vh;
     overflow: hidden;
-    font-family: Arial, sans-serif;
+    background: #111;
     color: white;
-    --transition-speed: 1s;
-    --object-fit: contain;
+    font-family: Arial, sans-serif;
 }
 
-/* THEMES ------------------------------------------------ */
-
-body.theme-light { background: #fafafa; color: #000; }
-body.theme-glass {
-    background: url('https://images.unsplash.com/photo-1520880867055-1e30d1cb001c?auto=format&w=1200') center/cover no-repeat;
-    backdrop-filter: blur(10px);
-}
-body.theme-neon {
-    background: #000;
-    color: #0ff;
-    text-shadow: 0 0 10px #0ff;
-}
-
-/* -------------------------------------------------------
-   SLIDESHOW
-------------------------------------------------------- */
+/* =============== SLIDESHOW ======================== */
 #slideshow {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
 }
-
 .slide {
     position: absolute;
-    width: 100%;
-    height: 100%;
+    inset: 0;
     opacity: 0;
-    transition: opacity var(--transition-speed) ease-in-out;
     display: flex;
     justify-content: center;
     align-items: center;
+    transition: opacity var(--trans-speed) ease-in-out;
 }
-
 .slide.active { opacity: 1; }
 
-.slide img,
-.slide iframe,
-.slide video {
+.slide img, .slide iframe, .slide video {
     width: 100%;
     height: 100%;
-    object-fit: var(--object-fit);
+    object-fit: var(--fit);
     border: none;
 }
 
-/* CAPTION */
-.caption {
-    position: absolute;
-    bottom: 15px;
-    width: 100%;
-    text-align: center;
-    font-size: 1.3em;
+/* ======== TRANSITION CLASSES (Phase 2 Core Set) ======== */
+
+/* FADE */
+.fade-in { animation: fadeIn var(--trans-speed) ease; }
+@keyframes fadeIn { from{opacity:0;} to{opacity:1;} }
+
+/* SLIDE LEFT */
+.slide-left { animation: slideLeft var(--trans-speed) ease; }
+@keyframes slideLeft { from{transform:translateX(100%);} to{transform:translateX(0);} }
+
+/* SLIDE RIGHT */
+.slide-right { animation: slideRight var(--trans-speed) ease; }
+@keyframes slideRight { from{transform:translateX(-100%);} to{transform:translateX(0);} }
+
+/* ZOOM IN */
+.zoom-in { animation: zoomIn var(--trans-speed) ease; }
+@keyframes zoomIn { from{transform:scale(1.3);} to{transform:scale(1);} }
+
+/* ZOOM OUT */
+.zoom-out { animation: zoomOut var(--trans-speed) ease; }
+@keyframes zoomOut { from{transform:scale(0.7);} to{transform:scale(1);} }
+
+/* BLUR TRANSITION */
+.blur-in { animation: blurIn var(--trans-speed) ease; }
+@keyframes blurIn { from{filter:blur(20px);} to{filter:blur(0);} }
+
+/* WIPE */
+.wipe { animation: wipe var(--trans-speed) ease; overflow:hidden; }
+@keyframes wipe { from{clip-path:inset(0 100% 0 0);} to{clip-path:inset(0 0 0 0);} }
+
+/* GLITCH (lightweight) */
+.glitch { animation: glitch 0.6s linear; }
+@keyframes glitch {
+    0%,100% { clip-path: inset(0 0 0 0); }
+    20% { clip-path: inset(10% 0 30% 0); }
+    40% { clip-path: inset(40% 0 20% 0); }
+    60% { clip-path: inset(5% 0 60% 0); }
+}
+
+/* KEN BURNS */
+.kenburns { animation: kenburns 12s ease-in-out forwards; }
+@keyframes kenburns {
+    from { transform: scale(1) translate(0,0); }
+    to   { transform: scale(1.25) translate(-20px, -20px); }
+}
+
+/* 3D CUBE */
+.cube { animation: cube var(--trans-speed) ease; transform-style: preserve-3d; }
+@keyframes cube {
+    from { transform: rotateY(90deg); }
+    to   { transform: rotateY(0deg); }
+}
+
+/* 3D FLIP */
+.flip { animation: flip var(--trans-speed) ease; transform-style: preserve-3d; }
+@keyframes flip {
+    from { transform: rotateY(-180deg); }
+    to   { transform: rotateY(0deg); }
+}
+
+/* ============= CAPTION + DESCRIPTION PANEL ================= */
+#caption-bar {
+    position: fixed;
+    bottom: 0;
+    width: 100vw;
     background: rgba(0,0,0,0.4);
-    padding: 5px 0;
-    cursor: pointer;
-}
-
-/* EDITABLE CAPTION MODE */
-.edit-caption {
-    border: 2px solid yellow;
-    background: rgba(0,0,0,0.7);
-}
-
-/* CONTROLS ------------------------------------------------ */
-#controls {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    z-index: 20;
-    display: flex;
-    gap: 10px;
-}
-
-button {
-    padding: 10px 15px;
-    background: rgba(255,255,255,0.15);
-    border: none;
-    color: white;
-    border-radius: 6px;
-    cursor: pointer;
-}
-button:hover { background: rgba(255,255,255,0.25); }
-
-/* UPLOAD AREA ------------------------------------------- */
-#upload-box {
-    position: absolute;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60%;
-    padding: 15px;
-    border: 2px dashed #666;
-    text-align: center;
-    border-radius: 10px;
-    background: rgba(255,255,255,0.05);
-    z-index: 999;
-    cursor: pointer;
-}
-
-/* THUMBNAIL GALLERY ------------------------------------- */
-#gallery {
-    position: absolute;
-    right: 0;
-    top: 0;
-    width: 160px;
-    height: 100vh;
-    overflow-y: auto;
-    background: rgba(0,0,0,0.5);
     padding: 10px;
-    z-index: 15;
+    text-align: center;
 }
-
-.thumb {
-    width: 100%;
-    height: 100px;
-    margin-bottom: 10px;
-    overflow: hidden;
-    cursor: pointer;
-    border: 2px solid transparent;
-}
-.thumb.active { border-color: yellow; }
-
-/* ADMIN MODE -------------------------------------------- */
-#admin-panel {
-    position: absolute;
-    top: 60px;
-    left: 10px;
-    background: rgba(0,0,0,0.7);
-    padding: 15px;
-    border-radius: 10px;
+#description-panel {
+    position: fixed;
+    right: 0;
+    top: 100px;
+    width: 300px;
+    height: 60vh;
+    background: rgba(0,0,0,0.6);
+    padding: 10px;
+    overflow-y: auto;
     display: none;
 }
 
-#admin-panel input {
-    margin-bottom: 5px;
+/* ============= DASHBOARD ========================== */
+#dashboard {
+    position: fixed;
+    background: rgba(20,20,20,0.9);
+    padding: 15px;
+    color: white;
+    border-radius: 10px;
+    z-index: 9999;
+    width: 320px;
+    max-height: 80vh;
+    overflow-y: auto;
 }
+
+/* Floating Mode */
+body[data-dash="floating"] #dashboard {
+    left: 20px; top: 20px;
+}
+
+/* Side Panel Mode */
+body[data-dash="side"] #dashboard {
+    left: 0; top: 0; bottom: 0;
+    width: 300px; border-radius: 0;
+}
+
+/* Dock Mode */
+body[data-dash="dock"] #dashboard {
+    left: 0; right: 0; bottom: 0;
+    width: 100%; height: 180px;
+    border-radius: 0;
+}
+
+/* Editor Mode (full split view) */
+body[data-dash="editor"] #dashboard {
+    left: 0; top: 0; bottom: 0;
+    width: 30vw; border-radius: 0;
+}
+
+/* ============= TIMELINE =========================== */
+#timeline {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    height: 80px;
+    background: rgba(0,0,0,0.7);
+    overflow-x: auto;
+    white-space: nowrap;
+}
+.timeline-item {
+    display: inline-block;
+    width: 80px;
+    height: 60px;
+    margin: 10px;
+    background: #333;
+    border: 2px solid #444;
+    cursor: grab;
+}
+.timeline-item.active { border-color: yellow; }
+.timeline-item img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ============= FILTERS PANEL ====================== */
+.filter-slider { width: 100%; }
+
+/* ============= AUDIO PLAYER ======================== */
+#audio-player {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 250px;
+    background: rgba(0,0,0,0.5);
+    padding: 10px;
+}
+
 </style>
 </head>
-<body class="theme-dark">
+<body data-dash="floating">
 
 <div id="slideshow"></div>
+<div id="caption-bar"></div>
+<div id="description-panel"></div>
+<div id="timeline"></div>
 
-<!-- CONTROLS -->
-<div id="controls">
-    <button onclick="prevSlide()">⟨ Prev</button>
-    <button onclick="nextSlide()">Next ⟩</button>
-    <button onclick="toggleFullscreen()">⤢ Fullscreen</button>
-    <button onclick="shuffleSlides()">Shuffle</button>
-    <button onclick="toggleTheme()">Theme</button>
-    <button onclick="toggleAdmin()">Admin</button>
-    <button onclick="exportSlides()">Export</button>
-    <button onclick="importSlides()">Import</button>
+<div id="audio-player">
+    <strong>Music Playlist</strong><br>
+    <audio id="bgm" controls></audio><br>
+    <button onclick="nextTrack()">Next Track</button>
 </div>
 
-<!-- ADMIN PANEL -->
-<div id="admin-panel">
-    <label>Password:</label><br>
-    <input type="password" id="admin-pass"><br>
-    <button onclick="loginAdmin()">Unlock</button>
-    <hr>
-    <label>Object Fit:</label>
-    <select onchange="changeObjectFit(this.value)">
-        <option value="contain">Contain</option>
-        <option value="cover">Cover</option>
-    </select><br><br>
+<!-- ================= DASHBOARD UI ================== -->
+<div id="dashboard">
 
-    <label>Transition Speed (ms):</label><br>
-    <input type="number" value="1000" onchange="changeSpeed(this.value)"><br>
-</div>
+<h2>Control Dashboard</h2>
 
-<!-- GALLERY -->
-<div id="gallery"></div>
+<!-- DASHBOARD MODE SWITCH -->
+<label><strong>Dashboard Layout</strong></label><br>
+<select onchange="setDashboardMode(this.value)">
+    <option value="floating">Floating</option>
+    <option value="side">Side Panel</option>
+    <option value="dock">Bottom Dock</option>
+    <option value="editor">Editor Layout</option>
+</select><br><br>
 
-<!-- UPLOAD BOX -->
-<div id="upload-box">
-    <strong>Click or Drop Files Here</strong><br>
-    Images • Videos • txt with embed links
-    <input type="file" id="file-input" multiple style="display:none;">
+<!-- TRANSITIONS -->
+<label><strong>Transition</strong></label><br>
+<select id="transitionSelect">
+    <option value="fade-in">Fade</option>
+    <option value="slide-left">Slide Left</option>
+    <option value="slide-right">Slide Right</option>
+    <option value="zoom-in">Zoom In</option>
+    <option value="zoom-out">Zoom Out</option>
+    <option value="blur-in">Blur</option>
+    <option value="wipe">Wipe</option>
+    <option value="glitch">Glitch</option>
+    <option value="kenburns">Ken Burns</option>
+    <option value="cube">3D Cube</option>
+    <option value="flip">3D Flip</option>
+</select><br><br>
+
+<!-- FILTERS -->
+<h3>Filters</h3>
+<label>Brightness</label><input type="range" min="50" max="150" value="100" class="filter-slider" id="bright"><br>
+<label>Contrast</label><input type="range" min="50" max="200" value="100" class="filter-slider" id="contrast"><br>
+<label>Saturation</label><input type="range" min="0" max="200" value="100" class="filter-slider" id="saturate"><br>
+<label>Hue</label><input type="range" min="0" max="360" value="0" class="filter-slider" id="hue"><br>
+<label>Blur</label><input type="range" min="0" max="10" value="0" class="filter-slider" id="blur"><br>
+
+<br>
+
+<!-- UPLOAD -->
+<h3>Add Slides</h3>
+<input type="file" id="files" multiple>
+
 </div>
 
 <script>
-/* =====================================================================================
-   CORE SLIDESHOW LOGIC
-===================================================================================== */
+
+/* ============================================================
+   PHASE 2 ULTRA JAVASCRIPT ENGINE
+============================================================ */
 
 let slides = [];
 let current = 0;
-let autoAdvance = true;
-let playingMusic = null;
-let isAdmin = false;
+let filters = {bright:100, contrast:100, saturate:100, hue:0, blur:0};
+let musicList = [];
+let trackIndex = 0;
 
-const showSlide = index => {
-    current = index % slides.length;
-    if (current < 0) current = slides.length - 1;
-
-    document.querySelectorAll('.slide').forEach((el, i) => {
-        el.classList.toggle('active', i === current);
+/* ============= FILTER ENGINE ================== */
+function applyFilters() {
+    let f = `
+        brightness(${filters.bright}%)
+        contrast(${filters.contrast}%)
+        saturate(${filters.saturate}%)
+        hue-rotate(${filters.hue}deg)
+        blur(${filters.blur}px)
+    `;
+    document.querySelectorAll('.slide').forEach(s => {
+        s.style.filter = f;
     });
+}
 
-    document.querySelectorAll('.thumb').forEach((el, i) => {
-        el.classList.toggle('active', i === current);
-    });
-};
+['bright','contrast','saturate','hue','blur'].forEach(id=>{
+    document.getElementById(id).oninput = e=>{
+        filters[id] = e.target.value;
+        applyFilters();
+    };
+});
 
-const nextSlide = () => showSlide(current + 1);
-const prevSlide = () => showSlide(current - 1);
+/* ============= DASHBOARD MODE SWITCH ============== */
+function setDashboardMode(mode) {
+    document.body.dataset.dash = mode;
+}
 
-setInterval(() => {
-    if (autoAdvance && slides.length > 1) nextSlide();
-}, 5000);
-
-/* =====================================================================================
-   SLIDE CREATION
-===================================================================================== */
-
-function addSlide(type, src, caption = '') {
-    const container = document.getElementById("slideshow");
-
-    const slide = document.createElement("div");
-    slide.className = "slide";
+/* ============= CREATE SLIDE ======================= */
+function createSlide(type, src, caption="", desc="") {
+    const s = document.createElement('div');
+    s.className = "slide";
 
     let el;
-    if (type === "img") {
-        el = document.createElement("img");
+    if (type==="img") {
+        el = document.createElement('img');
         el.src = src;
     }
-    if (type === "video") {
-        el = document.createElement("video");
-        el.src = src;
-        el.autoplay = true;
-        el.loop = true;
-        el.muted = true;
+    if (type==="video") {
+        el = document.createElement('video');
+        el.src = src; el.autoplay=true; el.loop=true; el.muted=true;
     }
-    if (type === "iframe") {
-        el = document.createElement("iframe");
-        el.src = src;
-        el.allowFullscreen = true;
+    if (type==="iframe") {
+        el = document.createElement('iframe');
+        el.src = src; el.allowFullscreen = true;
     }
 
-    const cap = document.createElement("div");
-    cap.className = "caption";
-    cap.textContent = caption || "Click to edit caption";
-    cap.onclick = () => editCaption(cap);
+    s.appendChild(el);
+    document.getElementById('slideshow').appendChild(s);
 
-    slide.appendChild(el);
-    slide.appendChild(cap);
-    container.appendChild(slide);
+    slides.push({type,src,caption,desc});
+    addTimelineThumb(src);
 
-    slides.push({type, src, caption});
-    addThumbnail(src);
-    showSlide(slides.length - 1);
-    saveToLocal();
+    if (slides.length===1) showSlide(0);
 }
 
-function addThumbnail(src) {
-    const gallery = document.getElementById("gallery");
-    const div = document.createElement("div");
-    div.className = "thumb";
-
-    div.onclick = () => showSlide([...gallery.children].indexOf(div));
-
-    const img = document.createElement("img");
-    img.src = src;
-    img.style.width = "100%";
-    img.style.height = "100%";
-    img.style.objectFit = "cover";
-
-    div.appendChild(img);
-    gallery.appendChild(div);
+/* ============= TIMELINE =========================== */
+function addTimelineThumb(src) {
+    const t = document.createElement('div');
+    t.className = "timeline-item";
+    t.innerHTML = `<img src="${src}">`;
+    t.onclick = ()=>showSlide([...t.parentNode.children].indexOf(t));
+    document.getElementById('timeline').appendChild(t);
 }
 
-/* =====================================================================================
-   CAPTION EDITING
-===================================================================================== */
-function editCaption(el) {
-    if (!isAdmin) return;
-    el.contentEditable = true;
-    el.classList.add("edit-caption");
-    el.onblur = () => {
-        el.contentEditable = false;
-        el.classList.remove("edit-caption");
-        const index = current;
-        slides[index].caption = el.textContent;
-        saveToLocal();
-    };
+/* ============= SHOW SLIDE ========================= */
+function showSlide(i) {
+    current = (i+slides.length)%slides.length;
+    document.querySelectorAll('.slide').forEach((s,idx)=>{
+        s.classList.toggle('active', idx===current);
+        s.classList.remove(
+            'fade-in','slide-left','slide-right','zoom-in','zoom-out',
+            'blur-in','wipe','glitch','kenburns','cube','flip'
+        );
+        if (idx===current) {
+            let tr = document.getElementById('transitionSelect').value;
+            s.classList.add(tr);
+        }
+    });
+
+    /* captions */
+    document.getElementById('caption-bar').innerText = slides[current].caption||"";
+
+    /* description */
+    document.getElementById('description-panel').innerText = slides[current].desc||"";
+
+    /* timeline highlight */
+    document.querySelectorAll('.timeline-item').forEach((t,idx)=>{
+        t.classList.toggle('active', idx===current);
+    });
 }
 
-/* =====================================================================================
-   THEMES
-===================================================================================== */
-
-let themes = ["theme-dark","theme-light","theme-glass","theme-neon"];
-let themeIndex = 0;
-
-function toggleTheme() {
-    themeIndex = (themeIndex + 1) % themes.length;
-    document.body.className = themes[themeIndex];
-}
-
-/* =====================================================================================
-   ADMIN MODE
-===================================================================================== */
-
-function toggleAdmin() {
-    document.getElementById("admin-panel").style.display =
-        document.getElementById("admin-panel").style.display === "none" ? "block" : "none";
-}
-
-function loginAdmin() {
-    const pass = document.getElementById("admin-pass").value;
-    if (pass === "admin") {
-        alert("Admin unlocked");
-        isAdmin = true;
-    } else {
-        alert("Incorrect password");
-    }
-}
-
-/* =====================================================================================
-   SETTINGS
-===================================================================================== */
-
-function changeObjectFit(val) {
-    document.body.style.setProperty("--object-fit", val);
-    saveToLocal();
-}
-
-function changeSpeed(ms) {
-    document.body.style.setProperty("--transition-speed", ms + "ms");
-    saveToLocal();
-}
-
-/* =====================================================================================
-   IMPORT / EXPORT
-===================================================================================== */
-
-function exportSlides() {
-    const data = JSON.stringify(slides);
-    const blob = new Blob([data], {type: "application/json"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "slideshow.json";
-    a.click();
-}
-
-function importSlides() {
-    const i = document.createElement("input");
-    i.type = "file";
-    i.accept = ".json";
-    i.onchange = e => {
-        const file = e.target.files[0];
-        const reader = new FileReader();
-        reader.onload = ev => {
-            const data = JSON.parse(ev.target.result);
-            data.forEach(s => addSlide(s.type, s.src, s.caption));
-            saveToLocal();
-        };
-        reader.readAsText(file);
-    };
-    i.click();
-}
-
-/* =====================================================================================
-   SAVING TO LOCAL STORAGE
-===================================================================================== */
-
-function saveToLocal() {
-    localStorage.setItem("slides", JSON.stringify(slides));
-}
-
-function loadFromLocal() {
-    const data = localStorage.getItem("slides");
-    if (!data) return;
-    JSON.parse(data).forEach(s => addSlide(s.type, s.src, s.caption));
-}
-
-/* =====================================================================================
-   FILE UPLOAD (drag & drop + click)
-===================================================================================== */
-
-const uploadBox = document.getElementById("upload-box");
-const fileInput = document.getElementById("file-input");
-
-uploadBox.onclick = () => fileInput.click();
-
-fileInput.onchange = () => handleFiles(fileInput.files);
-
-uploadBox.ondragover = e => { e.preventDefault(); };
-uploadBox.ondrop = e => {
-    e.preventDefault();
-    handleFiles(e.dataTransfer.files);
-};
-
-function handleFiles(files) {
-    [...files].forEach(file => {
+/* ============= FILE UPLOAD ======================== */
+document.getElementById('files').onchange = e=>{
+    [...e.target.files].forEach(file=>{
         let url = URL.createObjectURL(file);
-
-        if (file.type.startsWith("image/")) addSlide("img", url, file.name);
-        if (file.type.startsWith("video/")) addSlide("video", url, file.name);
-        if (file.type === "text/plain") {
-            const r = new FileReader();
-            r.onload = ev => {
-                ev.target.result.split("\n").forEach(line=>{
-                    if (line.trim()) addSlide("iframe", line.trim());
+        if (file.type.startsWith('image')) createSlide("img",url,file.name);
+        if (file.type.startsWith('video')) createSlide("video",url,file.name);
+        if (file.type==="text/plain") {
+            let r = new FileReader();
+            r.onload=ev=>{
+                ev.target.result.split("\n").forEach(l=>{
+                    if (l.trim()) createSlide("iframe", l.trim());
                 });
             };
             r.readAsText(file);
         }
     });
+};
+
+/* ============= AUDIO PLAYLIST ====================== */
+function nextTrack() {
+    if (musicList.length===0) return;
+    trackIndex = (trackIndex+1)%musicList.length;
+    document.getElementById('bgm').src = musicList[trackIndex];
 }
 
-/* =====================================================================================
-   FULLSCREEN
-===================================================================================== */
+document.getElementById('bgm').onended = nextTrack;
 
-function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen();
-    } else {
-        document.exitFullscreen();
-    }
-}
+/* ======= Basic Left/Right Navigation =============== */
+document.onkeydown = e=>{
+    if (e.key==="ArrowRight") showSlide(current+1);
+    if (e.key==="ArrowLeft") showSlide(current-1);
+};
 
-/* =====================================================================================
-   INIT
-===================================================================================== */
-loadFromLocal();
 </script>
-
 </body>
 </html>
