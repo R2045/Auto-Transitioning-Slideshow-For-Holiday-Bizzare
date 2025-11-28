@@ -169,7 +169,12 @@ body[data-dash="editor"] #dashboard {
     width: 30vw; border-radius: 0;
     max-height: 100vh;
 }
-    
+
+/* Add cursor to show the dashboard title is movable */
+body[data-dash="floating"] #dashboard h2 {
+    cursor: move;
+}
+
 /* ============= TIMELINE =========================== */
 #timeline {
     position: fixed;
@@ -192,6 +197,19 @@ body[data-dash="editor"] #dashboard {
 }
 .timeline-item.active { border-color: yellow; }
 .timeline-item img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Styles for drag-and-drop timeline */
+.timeline-item {
+    cursor: grab; /* Shows items are draggable */
+    position: relative; 
+}
+.timeline-item:active {
+    cursor: grabbing;
+}
+/* A class to "hide" the original item while dragging */
+.timeline-item.dragging {
+    opacity: 0.4;
+}
 
     /* Make timeline item relative for positioning the delete button */
 .timeline-item {
@@ -402,6 +420,7 @@ function createSlide(type, src, caption="", desc="") {
 function addTimelineThumb(src) {
     const t = document.createElement("div");
     t.className = "timeline-item";
+    t.draggable = true; // ⭐️ Make item draggable
 
     // For images, show thumbnail; for video/other, use placeholder
     if(src.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
@@ -412,26 +431,35 @@ function addTimelineThumb(src) {
 
     // Main click to show slide
     t.onclick = (e)=>{
-        // ⭐️ Don't trigger if 'delete' was clicked
         if (e.target.classList.contains('delete-slide-btn')) return; 
         stopSlideshow(); 
         showSlide([...t.parentNode.children].indexOf(t));
     }
     
-    // ⭐️ NEW: Add delete button
+    // Add delete button
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "delete-slide-btn";
-    deleteBtn.innerHTML = "&times;"; // '×' symbol
+    deleteBtn.innerHTML = "&times;";
     deleteBtn.title = "Delete Slide";
     deleteBtn.onclick = (e) => {
-        e.stopPropagation(); // Prevent timeline click
+        e.stopPropagation(); 
         const index = [...t.parentNode.children].indexOf(t);
         if (confirm("Are you sure you want to delete this slide?")) {
             deleteSlide(index);
         }
     };
     t.appendChild(deleteBtn);
-    // ⭐️ END NEW
+    
+    // ⭐️ NEW: Drag-and-drop listeners
+    t.addEventListener('dragstart', (e) => {
+        // Find index *at the moment drag starts*
+        const index = [...t.parentNode.children].indexOf(t);
+        e.dataTransfer.setData('text/plain', index);
+        t.classList.add('dragging');
+    });
+    t.addEventListener('dragend', () => {
+        t.classList.remove('dragging');
+    });
 
     document.getElementById('timeline').appendChild(t);
 }
@@ -766,6 +794,7 @@ function createEmbedSlide(html, caption="Embed") {
 function addTimelineThumbFromHTML(html) {
     const t = document.createElement("div");
     t.className = "timeline-item";
+    t.draggable = true; // ⭐️ Make item draggable
     
     let label = "Embed";
     if (html.includes("youtube.com")) label = "YouTube";
@@ -776,26 +805,35 @@ function addTimelineThumbFromHTML(html) {
     
     // Main click to show slide
     t.onclick = (e)=>{
-        // ⭐️ Don't trigger if 'delete' was clicked
         if (e.target.classList.contains('delete-slide-btn')) return; 
         stopSlideshow(); 
         showSlide([...t.parentNode.children].indexOf(t));
     };
 
-    // ⭐️ NEW: Add delete button
+    // Add delete button
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "delete-slide-btn";
-    deleteBtn.innerHTML = "&times;"; // '×' symbol
+    deleteBtn.innerHTML = "&times;";
     deleteBtn.title = "Delete Slide";
     deleteBtn.onclick = (e) => {
-        e.stopPropagation(); // Prevent timeline click
+        e.stopPropagation();
         const index = [...t.parentNode.children].indexOf(t);
         if (confirm("Are you sure you want to delete this slide?")) {
             deleteSlide(index);
         }
     };
     t.appendChild(deleteBtn);
-    // ⭐️ END NEW
+
+    // ⭐️ NEW: Drag-and-drop listeners
+    t.addEventListener('dragstart', (e) => {
+        // Find index *at the moment drag starts*
+        const index = [...t.parentNode.children].indexOf(t);
+        e.dataTransfer.setData('text/plain', index);
+        t.classList.add('dragging');
+    });
+    t.addEventListener('dragend', () => {
+        t.classList.remove('dragging');
+    });
 
     document.getElementById('timeline').appendChild(t);
 }
@@ -843,6 +881,143 @@ document.onkeydown = e=>{
         showSlide(current-1);
     }
 };
+
+/* ============================================================
+   FEATURE: DRAGGABLE DASHBOARD
+============================================================ */
+
+function makeDashboardDraggable() {
+    const dashboard = document.getElementById('dashboard');
+    const handle = dashboard.querySelector('h2');
+
+    if (!handle) return;
+
+    handle.onmousedown = function(event) {
+        // Only allow dragging in floating mode
+        if (document.body.dataset.dash !== 'floating') {
+            return;
+        }
+
+        event.preventDefault();
+        
+        let shiftX = event.clientX - dashboard.getBoundingClientRect().left;
+        let shiftY = event.clientY - dashboard.getBoundingClientRect().top;
+
+        function moveAt(pageX, pageY) {
+            dashboard.style.left = pageX - shiftX + 'px';
+            dashboard.style.top = pageY - shiftY + 'px';
+        }
+
+        function onMouseMove(event) {
+            moveAt(event.pageX, event.pageY);
+        }
+
+        // Move the dashboard on mousemove
+        document.addEventListener('mousemove', onMouseMove);
+
+        // Drop the dashboard, remove listeners
+        document.onmouseup = function() {
+            document.removeEventListener('mousemove', onMouseMove);
+            document.onmouseup = null;
+        };
+    };
+
+    handle.ondragstart = function() {
+        return false; // Disable native browser drag
+    };
+}
+
+// Run the function
+makeDashboardDraggable();
+
+/* ============================================================
+   FEATURE: REARRANGEABLE TIMELINE
+============================================================ */
+
+// This function reorders BOTH the JavaScript array and the DOM
+function reorderSlides(oldIndex, newIndex) {
+    const timeline = document.getElementById('timeline');
+    
+    // 1. Adjust array
+    // Remove the slide from its old position
+    const [movedSlide] = slides.splice(oldIndex, 1);
+    // Insert it into the new position
+    slides.splice(newIndex, 0, movedSlide);
+
+    // 2. Adjust DOM
+    // Get the DOM element to move
+    const itemToMove = timeline.children[oldIndex];
+    // Remove it
+    itemToMove.remove();
+    // Insert it in the new DOM position
+    timeline.insertBefore(itemToMove, timeline.children[newIndex]);
+
+    // 3. Update 'current' index to follow the slide
+    if (current === oldIndex) {
+        current = newIndex;
+    } else if (current > oldIndex && current <= newIndex) {
+        // Moved an item from before current to after, shift current left
+        current--;
+    } else if (current < oldIndex && current >= newIndex) {
+        // Moved an item from after current to before, shift current right
+        current++;
+    }
+    
+    // 4. Re-highlight the correct timeline item
+    showSlide(current);
+}
+
+// This function adds the drop listeners to the timeline
+function initTimelineSorting() {
+    const timeline = document.getElementById('timeline');
+
+    // Add 'dragover' to allow dropping
+    timeline.addEventListener('dragover', (e) => {
+        e.preventDefault(); // Necessary to allow 'drop'
+        
+        // Find the item we're dragging over
+        const afterElement = getDragAfterElement(timeline, e.clientX);
+        const dragging = document.querySelector('.dragging');
+        
+        if (afterElement == null) {
+            timeline.appendChild(dragging);
+        } else {
+            timeline.insertBefore(dragging, afterElement);
+        }
+    });
+    
+    // Add 'drop' to finalize the reorder
+    timeline.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const draggingItem = document.querySelector('.dragging');
+        if (!draggingItem) return;
+        
+        const oldIndex = parseInt(e.dataTransfer.getData('text/plain'));
+        const newIndex = [...timeline.children].indexOf(draggingItem);
+        
+        // Call the reorder function
+        reorderSlides(oldIndex, newIndex);
+    });
+}
+
+// Helper function to find where to drop the item
+function getDragAfterElement(container, x) {
+    const draggableElements = [...container.querySelectorAll('.timeline-item:not(.dragging)')];
+
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = x - box.left - box.width / 2;
+        
+        if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+// Run the function
+initTimelineSorting();
 
 </script>
 </body>
