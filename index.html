@@ -685,12 +685,20 @@ function addEmbed() {
         handled = true;
     }
 
-    // CASE 6 — Generic Website URL → Auto Link Preview (iFrame)
+    // ⭐️ FIX: CASE 6 — Generic Website URL (Create a link, NOT a broken iframe)
     if (!handled) {
-        createEmbedSlide(
-            `<iframe src="${raw}" style="width:100%; height:100%; border:0; background: #fff;"></iframe>`,
-            "Link Preview"
-        );
+        // Create a nice-looking link slide instead of a failed iframe
+        const cleanUrl = new URL(raw).hostname; // Get 'aviationweather.gov'
+        const linkHTML = `
+            <div style="width:100%; height:100%; background:#222; display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; padding:20px; box-sizing: border-box;">
+                <h2 style="font-size: 2.5em;">Link</h2>
+                <p style="font-size: 1.5em;">This site's security policy prevents embedding.</p>
+                <a href="${raw}" target="_blank" rel="noopener noreferrer" style="font-size: 1.8em; color: #3498db; background: #fff; padding: 15px 25px; border-radius: 8px; text-decoration: none; font-weight: bold;">
+                    Click to open: ${cleanUrl}
+                </a>
+            </div>
+        `;
+        createEmbedSlide(linkHTML, "Link: " + cleanUrl);
         handled = true;
     }
 
@@ -719,13 +727,33 @@ function createEmbedSlide(html, caption="Embed") {
     const s = document.createElement("div");
     s.className = "slide";
     s.innerHTML = html;
-    
-    // Make iframes load lazily
-    s.querySelectorAll("iframe").forEach(iframe => {
-        iframe.setAttribute("loading", "lazy");
+
+    // ⭐️ FIX: Force all links to open in a new tab
+    s.querySelectorAll('a').forEach(a => {
+        a.target = "_blank";
+        a.rel = "noopener noreferrer"; // Good practice for security
     });
 
     document.getElementById("slideshow").appendChild(s);
+
+    // ⭐️ FIX: Find and "re-activate" <script> tags
+    s.querySelectorAll('script').forEach(oldScript => {
+        const newScript = document.createElement("script");
+
+        // Copy all attributes (src, async, defer, etc.)
+        Array.from(oldScript.attributes).forEach(attr => {
+            newScript.setAttribute(attr.name, attr.value);
+        });
+
+        // Copy inline script content
+        if (oldScript.textContent) {
+            newScript.textContent = oldScript.textContent;
+        }
+
+        // Replace the old, "dead" script with the new, "live" one
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+    });
+    
     slides.push({ type:"embed", html, caption, desc:"", element: s });
 
     addTimelineThumbFromHTML(html);
