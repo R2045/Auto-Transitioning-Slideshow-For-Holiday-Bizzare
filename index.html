@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Ultra Slideshow App — Phase 2</title>
+<title>Auto-Transitioning Slideshow For Holiday Bizarre</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 
@@ -114,6 +114,7 @@ body {
     background: rgba(0,0,0,0.4);
     padding: 10px;
     text-align: center;
+    z-index: 100;
 }
 #description-panel {
     position: fixed;
@@ -124,7 +125,8 @@ body {
     background: rgba(0,0,0,0.6);
     padding: 10px;
     overflow-y: auto;
-    display: none;
+    display: none; /* Note: This is currently hidden */
+    z-index: 100;
 }
 
 /* ============= DASHBOARD ========================== */
@@ -136,8 +138,9 @@ body {
     border-radius: 10px;
     z-index: 9999;
     width: 320px;
-    max-height: 80vh;
+    max-height: 90vh;
     overflow-y: auto;
+    box-sizing: border-box;
 }
 
 /* Floating Mode */
@@ -149,6 +152,7 @@ body[data-dash="floating"] #dashboard {
 body[data-dash="side"] #dashboard {
     left: 0; top: 0; bottom: 0;
     width: 300px; border-radius: 0;
+    max-height: 100vh;
 }
 
 /* Dock Mode */
@@ -156,41 +160,26 @@ body[data-dash="dock"] #dashboard {
     left: 0; right: 0; bottom: 0;
     width: 100%; height: 180px;
     border-radius: 0;
+    max-height: 180px;
 }
 
 /* Editor Mode (full split view) */
 body[data-dash="editor"] #dashboard {
     left: 0; top: 0; bottom: 0;
     width: 30vw; border-radius: 0;
+    max-height: 100vh;
 }
     
-<h3>Add Embeds / Links</h3>
-<textarea id="embed-input" placeholder="Paste embed code, URL, YouTube link, etc." 
-style="width:100%; height:80px;"></textarea>
-<button onclick="addEmbed()">Add Embed</button>
-<br><br>
-
-    <h3>Upload Media</h3>
-<!-- Images and Videos -->
-<input type="file" id="media-upload" multiple accept="image/*,video/*"><br><br>
-
-<!-- Audio Upload -->
-<input type="file" id="music-upload" multiple accept="audio/*"><br><br>
-
-<!-- Embeds / Links -->
-<textarea id="embed-input" placeholder="Paste embed code, URL, YouTube link, etc." 
-style="width:100%; height:80px;"></textarea>
-<button onclick="addEmbed()">Add Embed</button><br><br>
-
 /* ============= TIMELINE =========================== */
 #timeline {
     position: fixed;
-    bottom: 0;
+    bottom: 80px; /* Adjusted to be above caption-bar */
     width: 100%;
     height: 80px;
     background: rgba(0,0,0,0.7);
     overflow-x: auto;
     white-space: nowrap;
+    z-index: 99;
 }
 .timeline-item {
     display: inline-block;
@@ -210,11 +199,13 @@ style="width:100%; height:80px;"></textarea>
 /* ============= AUDIO PLAYER ======================== */
 #audio-player {
     position: fixed;
-    top: 0;
-    right: 0;
+    top: 20px;
+    right: 20px;
     width: 250px;
     background: rgba(0,0,0,0.5);
     padding: 10px;
+    z-index: 9998;
+    border-radius: 8px;
 }
 
 </style>
@@ -229,25 +220,21 @@ style="width:100%; height:80px;"></textarea>
 <div id="audio-player">
     <strong>Music Playlist</strong><br>
 
-    <!-- Audio element -->
-    <audio id="bgm" controls></audio><br><br>
+    <audio id="bgm" controls style="width: 100%; margin-top: 5px;"></audio><br><br>
 
-    <!-- Upload audio files -->
-    <input type="file" id="music-upload" accept="audio/*" multiple><br><br>
+    <label>Add Music:</label>
+    <input type="file" id="music-upload" accept="audio/*" multiple style="width: 100%;"><br><br>
 
-    <!-- Track list -->
-    <div id="track-list" style="max-height:150px; overflow-y:auto;"></div>
-
+    <div id="track-list" style="max-height:150px; overflow-y:auto; background: rgba(0,0,0,0.3); border-radius: 4px;"></div>
+    <br>
     <button onclick="prevTrack()">Prev Track</button>
     <button onclick="nextTrack()">Next Track</button>
 </div>
 
-<!-- ================= DASHBOARD UI ================== -->
 <div id="dashboard">
 
 <h2>Control Dashboard</h2>
 
-<!-- DASHBOARD MODE SWITCH -->
 <label><strong>Dashboard Layout</strong></label><br>
 <select onchange="setDashboardMode(this.value)">
     <option value="floating">Floating</option>
@@ -256,7 +243,16 @@ style="width:100%; height:80px;"></textarea>
     <option value="editor">Editor Layout</option>
 </select><br><br>
 
-<!-- TRANSITIONS -->
+<hr>
+<h3>Auto-Transition</h3>
+<label>Delay (seconds)</label><br>
+<input type="number" id="interval-duration" value="5" style="width: 60px;">
+<br><br>
+<button onclick="startSlideshow()">Start Auto-Play</button>
+<button onclick="stopSlideshow()">Stop</button>
+<hr>
+<br>
+
 <label><strong>Transition</strong></label><br>
 <select id="transitionSelect">
     <option value="fade-in">Fade</option>
@@ -272,26 +268,30 @@ style="width:100%; height:80px;"></textarea>
     <option value="flip">3D Flip</option>
 </select><br><br>
 
-<!-- FILTERS -->
 <h3>Filters</h3>
 <label>Brightness</label><input type="range" min="50" max="150" value="100" class="filter-slider" id="bright"><br>
 <label>Contrast</label><input type="range" min="50" max="200" value="100" class="filter-slider" id="contrast"><br>
 <label>Saturation</label><input type="range" min="0" max="200" value="100" class="filter-slider" id="saturate"><br>
 <label>Hue</label><input type="range" min="0" max="360" value="0" class="filter-slider" id="hue"><br>
 <label>Blur</label><input type="range" min="0" max="10" value="0" class="filter-slider" id="blur"><br>
-
 <br>
 
-<!-- UPLOAD -->
-<h3>Add Slides</h3>
-<input type="file" id="files" multiple>
+<h3>Add Media Slides</h3>
+<p>Upload images, videos, or .txt file of links.</p>
+<input type="file" id="files" multiple accept="image/*,video/*,.txt,text/plain"><br><br>
+
+<h3>Add Embeds / Links</h3>
+<textarea id="embed-input" placeholder="Paste embed code, URL, YouTube link, etc."
+style="width:98%; height:80px;"></textarea><br>
+<button onclick="addEmbed()" style="margin-top:5px;">Add Embed</button>
+<br><br>
 
 </div>
 
 <script>
 
 /* ============================================================
-   PHASE 2 ULTRA JAVASCRIPT ENGINE
+    PHASE 2 ULTRA JAVASCRIPT ENGINE
 ============================================================ */
 
 let slides = [];
@@ -299,6 +299,7 @@ let current = 0;
 let filters = {bright:100, contrast:100, saturate:100, hue:0, blur:0};
 let musicList = [];
 let trackIndex = 0;
+let slideshowInterval = null; // ⭐️ ADDED for auto-transition
 
 /* ============= FILTER ENGINE ================== */
 function applyFilters() {
@@ -340,14 +341,21 @@ function createSlide(type, src, caption="", desc="") {
         el.src = src; 
         el.autoplay=true; 
         el.loop=true; 
-        el.muted=true; 
+        el.muted=true; // Muted by default so music can play
         el.controls=true;
     }
+    
+    // Only append if 'el' was created
+    if (el) {
+        s.appendChild(el);
+    } else {
+        console.error("Unknown slide type:", type);
+        return; // Don't add a broken slide
+    }
 
-    s.appendChild(el);
     document.getElementById("slideshow").appendChild(s);
 
-    slides.push({ type, src, caption, desc });
+    slides.push({ type, src, caption, desc, element: s });
     addTimelineThumb(src);
 
     if(slides.length===1) showSlide(0);
@@ -365,13 +373,17 @@ function addTimelineThumb(src) {
         t.innerHTML = `<div style="background:#444;color:white;font-size:10px;text-align:center;padding-top:20px;">Media</div>`;
     }
 
-    t.onclick = ()=>showSlide([...t.parentNode.children].indexOf(t));
+    t.onclick = ()=>{
+        stopSlideshow(); // ⭐️ ADDED: Stop auto-play on manual click
+        showSlide([...t.parentNode.children].indexOf(t));
+    }
     document.getElementById('timeline').appendChild(t);
 }
 
 /* ============= SHOW SLIDE ========================= */
 function showSlide(i) {
-    current = (i+slides.length)%slides.length;
+    current = (i + slides.length) % slides.length;
+    
     document.querySelectorAll('.slide').forEach((s,idx)=>{
         s.classList.toggle('active', idx===current);
         s.classList.remove(
@@ -384,11 +396,28 @@ function showSlide(i) {
         }
     });
 
+    // Handle video play/pause
+    slides.forEach((slide, idx) => {
+        if (slide.type === "video") {
+            const videoEl = slide.element.querySelector("video");
+            if (idx === current) {
+                videoEl.play().catch(e => console.log("Video autoplay blocked."));
+            } else {
+                videoEl.pause();
+            }
+        }
+    });
+
     /* captions */
     document.getElementById('caption-bar').innerText = slides[current].caption||"";
 
     /* description */
-    document.getElementById('description-panel').innerText = slides[current].desc||"";
+    const descPanel = document.getElementById('description-panel');
+    const descText = slides[current].desc || "";
+    descPanel.innerText = descText;
+    // Show description panel only if there is text
+    descPanel.style.display = descText ? "block" : "none";
+
 
     /* timeline highlight */
     document.querySelectorAll('.timeline-item').forEach((t,idx)=>{
@@ -402,11 +431,17 @@ document.getElementById('files').onchange = e=>{
         let url = URL.createObjectURL(file);
         if (file.type.startsWith('image')) createSlide("img",url,file.name);
         if (file.type.startsWith('video')) createSlide("video",url,file.name);
-        if (file.type==="text/plain") {
+        
+        // ⭐️ FIXED: Text file upload logic
+        if (file.type === "text/plain") {
             let r = new FileReader();
-            r.onload=ev=>{
-                ev.target.result.split("\n").forEach(l=>{
-                    if (l.trim()) createSlide("iframe", l.trim());
+            r.onload = ev => {
+                ev.target.result.split("\n").forEach(line => {
+                    if (line.trim()) {
+                        // Use the existing addEmbed logic
+                        document.getElementById("embed-input").value = line.trim();
+                        addEmbed();
+                    }
                 });
             };
             r.readAsText(file);
@@ -414,32 +449,12 @@ document.getElementById('files').onchange = e=>{
     });
 };
 
-    if (file.type.startsWith("video")) {
-    let url = URL.createObjectURL(file);
-    createSlide("video", url, file.name);
-}
+// ⭐️ REMOVED: Stray 'if' block that was here
+// ⭐️ REMOVED: Duplicate 'musicList' and 'trackIndex' declarations
 
-/* ============= AUDIO PLAYLIST ====================== */
-function nextTrack() {
-    if (musicList.length===0) return;
-    trackIndex = (trackIndex+1)%musicList.length;
-    document.getElementById('bgm').src = musicList[trackIndex];
-}
-
-document.getElementById('bgm').onended = nextTrack;
-
-/* ======= Basic Left/Right Navigation =============== */
-document.onkeydown = e=>{
-    if (e.key==="ArrowRight") showSlide(current+1);
-    if (e.key==="ArrowLeft") showSlide(current-1);
-};
-
-    /* ============================================================
+/* ============================================================
    MUSIC PLAYLIST ENGINE — (Phase 2 Ultra Upgrade)
 ============================================================ */
-
-let musicList = [];
-let trackIndex = 0;
 
 /* Update track list visually */
 function refreshTrackList() {
@@ -451,7 +466,7 @@ function refreshTrackList() {
         div.style.padding = "5px";
         div.style.cursor = "pointer";
         div.style.background = i === trackIndex ? "rgba(255,255,0,0.2)" : "transparent";
-
+        div.style.borderBottom = "1px solid #444";
         div.innerText = (i+1) + ". " + track.name;
         div.onclick = () => {
             trackIndex = i;
@@ -501,72 +516,89 @@ document.getElementById("music-upload").onchange = (e) => {
     refreshTrackList();
 
     // Auto-play first track if none playing
-    if (musicList.length === 1) {
-        playCurrentTrack();
+    if (musicList.length > 0 && document.getElementById("bgm").paused) {
+        if (trackIndex === 0 && !document.getElementById("bgm").src) {
+             playCurrentTrack();
+        }
     }
 };
 
-    /* ============================================================
+/* ============================================================
    EMBEDS + LINK PREVIEW + VIDEO LINK ENGINE
 ============================================================ */
 
 function addEmbed() {
     const raw = document.getElementById("embed-input").value.trim();
     if (!raw) return;
+    
+    let handled = false;
 
     // CASE 1 — Raw embed code (iframe, script, HTML blocks)
     if (raw.startsWith("<")) {
         createEmbedSlide(raw, "Custom Embed");
-        document.getElementById("embed-input").value = "";
-        return;
+        handled = true;
     }
 
     // CASE 2 — YouTube Link
-    if (raw.includes("youtube.com") || raw.includes("youtu.be")) {
+    if (!handled && (raw.includes("youtube.com") || raw.includes("youtu.be"))) {
         const id = extractYouTubeID(raw);
         if (id) {
             createEmbedSlide(
-                `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${id}" frameborder="0" allowfullscreen></iframe>`,
+                `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${id}?autoplay=1&mute=1" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`,
                 "YouTube"
             );
-            document.getElementById("embed-input").value = "";
-            return;
+            handled = true;
         }
     }
 
     // CASE 3 — Vimeo Link
-    if (raw.includes("vimeo.com")) {
-        const id = raw.split("/").pop();
+    if (!handled && raw.includes("vimeo.com")) {
+        const id = raw.split("/").pop().split("?")[0];
         createEmbedSlide(
-            `<iframe src="https://player.vimeo.com/video/${id}" frameborder="0" allowfullscreen></iframe>`,
+            `<iframe src="https://player.vimeo.com/video/${id}?autoplay=1&muted=1" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>`,
             "Vimeo"
         );
-        document.getElementById("embed-input").value = "";
-        return;
+        handled = true;
     }
 
     // CASE 4 — Video File URL
-    if (raw.match(/\.(mp4|webm|ogg|mov)$/i)) {
+    if (!handled && raw.match(/\.(mp4|webm|ogg|mov)$/i)) {
         createSlide("video", raw, "Video Link");
-        document.getElementById("embed-input").value = "";
-        return;
+        handled = true;
+    }
+    
+    // CASE 5 - Image File URL
+    if (!handled && raw.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+        createSlide("img", raw, "Image Link");
+        handled = true;
     }
 
-    // CASE 5 — Generic Website URL → Auto Link Preview
-    createLinkPreviewSlide(raw);
+    // CASE 6 — Generic Website URL → Auto Link Preview (iFrame)
+    if (!handled) {
+        createEmbedSlide(
+            `<iframe src="${raw}" style="width:100%; height:100%; border:0; background: #fff;"></iframe>`,
+            "Link Preview"
+        );
+        handled = true;
+    }
+
     document.getElementById("embed-input").value = "";
 }
     
 /* Extract YouTube Video ID */
 function extractYouTubeID(url) {
     let id = null;
-
-    if (url.includes("youtu.be/"))
-        id = url.split("youtu.be/")[1].split(/[?&]/)[0];
-
-    if (url.includes("watch?v="))
-        id = url.split("watch?v=")[1].split("&")[0];
-
+    try {
+        const urlObj = new URL(url);
+        if (urlObj.hostname === "youtu.be") {
+            id = urlObj.pathname.substring(1);
+        } else if (urlObj.hostname.includes("youtube.com")) {
+            id = urlObj.searchParams.get("v");
+        }
+        if(id) return id.split(/[?&]/)[0];
+    } catch (e) {
+        console.error("Invalid URL for YouTube", e);
+    }
     return id;
 }
 
@@ -575,48 +607,81 @@ function createEmbedSlide(html, caption="Embed") {
     const s = document.createElement("div");
     s.className = "slide";
     s.innerHTML = html;
+    
+    // Make iframes load lazily
+    s.querySelectorAll("iframe").forEach(iframe => {
+        iframe.setAttribute("loading", "lazy");
+    });
 
     document.getElementById("slideshow").appendChild(s);
-    slides.push({ type:"embed", html, caption, desc:"" });
+    slides.push({ type:"embed", html, caption, desc:"", element: s });
 
     addTimelineThumbFromHTML(html);
     if (slides.length===1) showSlide(0);
 }
 
-/* Create a link preview slide */
-function createLinkPreviewSlide(url) {
-    const previewHTML = `
-        <div style="width:100%; height:100%; background:#222; display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; padding:20px;">
-            <h2>Preview: ${url}</h2>
-            <iframe src="${url}" style="flex:1; width:90%; border:0;"></iframe>
-        </div>
-    `;
-    createEmbedSlide(previewHTML, "Link Preview");
-}
+// ⭐️ REMOVED: Redundant 'createLinkPreviewSlide' function (merged into addEmbed)
 
 /* Thumbnail for non-image items */
 function addTimelineThumbFromHTML(html) {
     const t = document.createElement("div");
     t.className = "timeline-item";
-    t.innerHTML = `<div style="background:#444; color:white; font-size:10px; text-align:center; padding-top:20px;">Embed</div>`;
-    t.onclick = ()=>showSlide([...t.parentNode.children].indexOf(t));
+    
+    let label = "Embed";
+    if (html.includes("youtube.com")) label = "YouTube";
+    else if (html.includes("vimeo.com")) label = "Vimeo";
+    else if (html.includes("<iframe")) label = "Link";
+    
+    t.innerHTML = `<div style="background:#444; color:white; font-size:10px; text-align:center; padding-top:20px;">${label}</div>`;
+    t.onclick = ()=>{
+        stopSlideshow(); // ⭐️ ADDED: Stop auto-play
+        showSlide([...t.parentNode.children].indexOf(t));
+    }
     document.getElementById('timeline').appendChild(t);
 }
 
-    /* ============================================================
-   MEDIA UPLOAD HANDLER — Images + Videos + Embeds
+// ⭐️ REMOVED: Redundant 'media-upload' handler
+
+/* ============================================================
+   ⭐️ NEW: AUTO-TRANSITION ENGINE ⭐️
 ============================================================ */
 
-document.getElementById("media-upload").onchange = function(e){
-    const files = [...e.target.files];
-    files.forEach(file => {
-        const url = URL.createObjectURL(file);
-        if(file.type.startsWith("image/")) {
-            createSlide("img", url, file.name);
-        } else if(file.type.startsWith("video/")) {
-            createSlide("video", url, file.name);
-        }
-    });
+function startSlideshow() {
+    stopSlideshow(); // Clear any existing timer first
+    
+    let duration = document.getElementById('interval-duration').value * 1000;
+    if (duration < 1000) duration = 1000; // Minimum 1 second
+    
+    if (slides.length > 0) {
+        slideshowInterval = setInterval(() => {
+            showSlide(current + 1);
+        }, duration);
+    }
+}
+
+function stopSlideshow() {
+    if (slideshowInterval) {
+        clearInterval(slideshowInterval);
+        slideshowInterval = null;
+    }
+}
+
+
+/* ======= Basic Left/Right Navigation =============== */
+document.onkeydown = e=>{
+    // Ignore keys if user is typing in an input
+    if (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA") {
+        return;
+    }
+    
+    if (e.key==="ArrowRight") {
+        stopSlideshow(); // ⭐️ ADDED: Stop auto-play
+        showSlide(current+1);
+    }
+    if (e.key==="ArrowLeft") {
+        stopSlideshow(); // ⭐️ ADDED: Stop auto-play
+        showSlide(current-1);
+    }
 };
 
 </script>
