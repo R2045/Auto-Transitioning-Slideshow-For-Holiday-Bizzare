@@ -263,6 +263,39 @@ body[data-dash="floating"] #dashboard h2 {
     border-radius: 8px;
 }
 
+/* ⭐️ NEW: Styles for the Stream-Here-Placeholder */
+.stream-placeholder {
+    width: 100%;
+    height: 100%;
+    background: #222;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+.stream-video {
+    display: none; 
+    width: 100%; 
+    height: 100%;
+    background: #000;
+}
+.stream-start-btn {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: white;
+    background: #007bff;
+    border: none;
+    padding: 20px 30px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+.stream-start-btn:hover {
+    background: #0056b3;
+}
+    
 </style>
 </head>
 <body data-dash="floating">
@@ -335,6 +368,18 @@ body[data-dash="floating"] #dashboard h2 {
 <p>Upload images, videos, or .txt file of links.</p>
 <input type="file" id="files" multiple accept="image/*,video/*,.txt,text/plain"><br><br>
 
+<!-- UPLOAD -->
+<h3>Add Media Slides</h3>
+<p>Upload images, videos, or .txt file of links.</p>
+<input type="file" id="files" multiple accept="image/*,video/*,.txt,text/plain"><br><br>
+
+<!-- ⭐️ NEW: Add this button -->
+<button onclick="addStreamSlide()" style="width:98%; padding: 10px; background: #007bff; color: white; border-radius: 5px; cursor: pointer;">
+    Add Live Stream Slide
+</button>
+<br><br>
+
+<!-- ADD EMBEDS (Moved from <style> block) -->
 <h3>Add Embeds / Links</h3>
 <textarea id="embed-input" placeholder="Paste embed code, URL, YouTube link, etc."
 style="width:98%; height:80px;"></textarea><br>
@@ -354,8 +399,9 @@ let current = 0;
 let filters = {bright:100, contrast:100, saturate:100, hue:0, blur:0};
 let musicList = [];
 let trackIndex = 0;
-let slideshowInterval = null; // ⭐️ ADDED for auto-transition
-
+let slideshowInterval = null;
+let currentStream = null; // ⭐️ NEW: Add this variable
+    
 /* ============= FILTER ENGINE ================== */
 function applyFilters() {
     let f = `
@@ -420,14 +466,21 @@ function createSlide(type, src, caption="", desc="") {
 function addTimelineThumb(src) {
     const t = document.createElement("div");
     t.className = "timeline-item";
-    t.draggable = true; // ⭐️ Make item draggable
+    t.draggable = true; // Make item draggable
 
-    // For images, show thumbnail; for video/other, use placeholder
-    if(src.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+    // ⭐️ MODIFIED: Handle 'stream' type
+    if (src === "stream") {
+        t.innerHTML = `<div style="background:#007bff;color:white;font-size:10px;text-align:center;padding-top:20px;">Stream</div>`;
+    }
+    // For images, show thumbnail
+    else if (src.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
         t.innerHTML = `<img src="${src}">`;
-    } else {
+    } 
+    // for video/other, use placeholder
+    else {
         t.innerHTML = `<div style="background:#444;color:white;font-size:10px;text-align:center;padding-top:20px;">Media</div>`;
     }
+    // ⭐️ END MODIFICATION
 
     // Main click to show slide
     t.onclick = (e)=>{
@@ -450,9 +503,8 @@ function addTimelineThumb(src) {
     };
     t.appendChild(deleteBtn);
     
-    // ⭐️ NEW: Drag-and-drop listeners
+    // Drag-and-drop listeners
     t.addEventListener('dragstart', (e) => {
-        // Find index *at the moment drag starts*
         const index = [...t.parentNode.children].indexOf(t);
         e.dataTransfer.setData('text/plain', index);
         t.classList.add('dragging');
@@ -466,7 +518,10 @@ function addTimelineThumb(src) {
 
 /* ============= SHOW SLIDE ========================= */
 function showSlide(i) {
-    // ⭐️ NEW: Handle empty state
+    // ⭐️ CRITICAL: Stop any running stream when changing slides
+    stopCurrentStream();
+
+    // Handle empty state
     if (slides.length === 0) {
         document.getElementById('caption-bar').innerText = "";
         document.getElementById('description-panel').style.display = "none";
@@ -475,9 +530,19 @@ function showSlide(i) {
         current = 0;
         return;
     }
-    // ⭐️ END NEW
 
     current = (i + slides.length) % slides.length;
+    
+    // Check if the new slide is a stream slide
+    const isStreamSlide = slides[current].type === "stream";
+
+    // ⭐️ If it's a stream slide, pause the auto-transition
+    if (isStreamSlide && slideshowInterval) {
+        clearInterval(slideshowInterval);
+        slideshowInterval = null;
+        // We don't restart it. The user must click "Start Stream",
+        // and then manually navigate away or click "Start Auto-Play" again.
+    }
     
     document.querySelectorAll('.slide').forEach((s,idx)=>{
         s.classList.toggle('active', idx===current);
@@ -512,14 +577,23 @@ function showSlide(i) {
     const descPanel = document.getElementById('description-panel');
     const descText = slides[current].desc || "";
     descPanel.innerText = descText;
-    // Show description panel only if there is text
     descPanel.style.display = descText ? "block" : "none";
-
 
     /* timeline highlight */
     document.querySelectorAll('.timeline-item').forEach((t,idx)=>{
         t.classList.toggle('active', idx===current);
     });
+}
+
+// ...
+
+function stopSlideshow() {
+    if (slideshowInterval) {
+        clearInterval(slideshowInterval);
+        slideshowInterval = null;
+    }
+    // ⭐️ CRITICAL: Also stop any stream when slideshow is stopped
+    stopCurrentStream();
 }
 
 /* ============= ⭐️ NEW: DELETE SLIDE ====================== */
@@ -864,6 +938,95 @@ function stopSlideshow() {
     }
 }
 
+/* ============================================================
+   ⭐️ NEW: LIVE STREAMING FUNCTIONS ⭐️
+============================================================ */
+
+function addStreamSlide() {
+    stopSlideshow(); // Pause auto-play
+
+    const s = document.createElement("div");
+    s.className = "slide";
+    s.dataset.type = "stream"; // Add data-type for identification
+
+    // Create the placeholder with video element (initially hidden) and button
+    s.innerHTML = `
+        <div class="stream-placeholder">
+            <video class="stream-video"></video>
+            <button class="stream-start-btn">Click to Start Stream</button>
+        </div>
+    `;
+
+    // Add click event to the button *inside* this specific slide
+    s.querySelector('.stream-start-btn').onclick = () => {
+        startStream(s);
+    };
+
+    document.getElementById("slideshow").appendChild(s);
+    slides.push({ type: "stream", caption: "Live Stream", desc: "", element: s });
+
+    addTimelineThumb("stream"); // Use a special key for the thumbnail
+    if (slides.length === 1) showSlide(0);
+}
+
+async function startStream(slideElement) {
+    stopCurrentStream(); // Stop any other stream first
+
+    try {
+        // Prompt user to select a tab
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+            video: { cursor: "always", displaySurface: "browser" },
+            audio: { suppressLocalAudioPlayback: false },
+            preferCurrentTab: true,
+            systemAudio: "include"
+        });
+        
+        currentStream = stream; // Store the stream globally
+        
+        // Find elements inside this slide
+        const video = slideElement.querySelector('.stream-video');
+        const button = slideElement.querySelector('.stream-start-btn');
+        
+        // Play the stream
+        video.srcObject = stream;
+        video.play();
+        
+        // Update UI
+        video.style.display = 'block';
+        button.style.display = 'none';
+
+        // Listen for when user clicks the browser's "Stop sharing" button
+        stream.getVideoTracks()[0].onended = () => {
+            stopCurrentStream();
+        };
+
+    } catch (err) {
+        console.error("Error starting stream:", err);
+        stopCurrentStream(); // Clean up on error
+    }
+}
+
+function stopCurrentStream() {
+    if (!currentStream) return; // No stream to stop
+
+    // Stop all tracks (video and audio)
+    currentStream.getTracks().forEach(track => track.stop());
+    currentStream = null;
+
+    // Reset UI for ALL stream slides
+    document.querySelectorAll('.slide[data-type="stream"]').forEach(slide => {
+        const video = slide.querySelector('.stream-video');
+        const button = slide.querySelector('.stream-start-btn');
+        
+        if (video) {
+            video.srcObject = null;
+            video.style.display = 'none';
+        }
+        if (button) {
+            button.style.display = 'block';
+        }
+    });
+}
 
 /* ======= Basic Left/Right Navigation =============== */
 document.onkeydown = e=>{
