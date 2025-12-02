@@ -295,7 +295,49 @@ body[data-dash="floating"] #dashboard h2 {
 .stream-start-btn:hover {
     background: #0056b3;
 }
-    
+
+/* ⭐️ NEW: Global Controls (Show/Fullscreen) */
+#global-controls {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 10001;
+    display: flex;
+    gap: 10px;
+}
+#global-controls button {
+    background: rgba(0,0,0,0.5);
+    color: white;
+    border: 1px solid #777;
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+}
+#global-controls button:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+/* ⭐️ NEW: Dashboard Close Button */
+#close-panel-btn {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    width: 30px;
+    height: 30px;
+    background: #555;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    font-size: 20px;
+    line-height: 28px;
+    text-align: center;
+    cursor: pointer;
+    z-index: 10;
+}
+#close-panel-btn:hover {
+    background: #888;
+}
+
 </style>
 </head>
 <body data-dash="floating">
@@ -958,7 +1000,7 @@ function addStreamSlide() {
     // Create the placeholder with video element (initially hidden) and button
     s.innerHTML = `
         <div class="stream-placeholder">
-            <video class="stream-video"></video>
+            <video class="stream-video" muted playsinline></video>
             <button class="stream-start-btn">Click to Start Stream</button>
         </div>
     `;
@@ -1187,6 +1229,36 @@ function getDragAfterElement(container, x) {
 
 // Run the function
 initTimelineSorting();
+
+/* ============================================================
+   ⭐️ NEW: Fullscreen and Panel Toggle Logic
+============================================================ */
+
+const dashboard = document.getElementById('dashboard');
+const showPanelBtn = document.getElementById('show-panel-btn');
+const closePanelBtn = document.getElementById('close-panel-btn');
+const fullscreenBtn = document.getElementById('fullscreen-btn');
+
+// --- Toggle Panel Logic ---
+showPanelBtn.onclick = () => {
+    dashboard.style.display = 'block';
+};
+closePanelBtn.onclick = () => {
+    dashboard.style.display = 'none';
+};
+
+// --- Toggle Fullscreen Logic ---
+fullscreenBtn.onclick = () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.error(`Error attempting to enable fullscreen: ${err.message}`);
+        });
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        }
+    }
+};
 
 </script>
 </body>
