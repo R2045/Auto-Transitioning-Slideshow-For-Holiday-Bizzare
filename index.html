@@ -225,6 +225,17 @@ body[data-dash="floating"] #dashboard h2 {
 .timeline-item.active { border-color: yellow; }
 .timeline-item img { width: 100%; height: 100%; object-fit: cover; }
 
+/* ⭐️ NEW: Add transition for fading controls */
+#timeline, #caption-bar {
+    transition: opacity 0.5s ease-in-out;
+}
+
+/* ⭐️ NEW: Hidden class to fade out controls */
+#timeline.hidden, #caption-bar.hidden {
+    opacity: 0;
+    pointer-events: none; /* Prevents clicking on the invisible bar */
+}
+    
 /* ⭐️ NEW: Style for the delete button on thumbnails */
 .delete-slide-btn {
     position: absolute;
@@ -448,7 +459,8 @@ let filters = {bright:100, contrast:100, saturate:100, hue:0, blur:0};
 let musicList = [];
 let trackIndex = 0;
 let slideshowInterval = null;
-let currentStream = null; // ⭐️ NEW: Add this variable
+let currentStream = null;
+let inactivityTimer = null; // ⭐️ NEW: Add this variable
     
 /* ============= FILTER ENGINE ================== */
 function applyFilters() {
@@ -566,7 +578,9 @@ function addTimelineThumb(src) {
 
 /* ============= SHOW SLIDE ========================= */
 function showSlide(i) {
-    // ⭐️ CRITICAL: Stop any running stream when changing slides
+    resetInactivityTimer(); // ⭐️ NEW: Add this line at the top
+    
+    // CRITICAL: Stop any running stream when changing slides
     stopCurrentStream();
 
     // Handle empty state
@@ -1076,6 +1090,32 @@ function stopCurrentStream() {
     });
 }
 
+/* ============================================================
+   ⭐️ NEW: INACTIVITY TIMER FOR UI
+============================================================ */
+
+function hideControls() {
+    document.getElementById('timeline').classList.add('hidden');
+    document.getElementById('caption-bar').classList.add('hidden');
+}
+
+function showControls() {
+    document.getElementById('timeline').classList.remove('hidden');
+    document.getElementById('caption-bar').classList.remove('hidden');
+}
+
+function resetInactivityTimer() {
+    showControls(); // Always show controls on activity
+    
+    // Clear the old timer if it exists
+    if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+    }
+    
+    // Set a new timer to hide them after 5 seconds
+    inactivityTimer = setTimeout(hideControls, 5000); // 5000ms = 5 seconds
+}
+    
 /* ======= Basic Left/Right Navigation =============== */
 document.onkeydown = e=>{
     // Ignore keys if user is typing in an input
@@ -1260,6 +1300,12 @@ fullscreenBtn.onclick = () => {
     }
 };
 
+/* ============================================================
+   ⭐️ NEW: Start the inactivity listener
+============================================================ */
+document.onmousemove = resetInactivityTimer; // Reset on mouse move
+resetInactivityTimer(); // Start the timer on page load
+ 
 </script>
 </body>
 </html>
