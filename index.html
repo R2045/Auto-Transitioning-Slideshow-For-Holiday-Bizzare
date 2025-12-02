@@ -299,7 +299,14 @@ body[data-dash="floating"] #dashboard h2 {
 </style>
 </head>
 <body data-dash="floating">
+    
+<!-- ⭐️ NEW: Add this block for global controls -->
+<div id="global-controls">
+    <button id="show-panel-btn">Show Controls</button>
+    <button id="fullscreen-btn">Toggle Fullscreen</button>
+</div>
 
+<!-- (Your existing HTML <div id="slideshow">...</div> etc. goes here) -->
 <div id="slideshow"></div>
 <div id="caption-bar"></div>
 <div id="description-panel"></div>
@@ -320,8 +327,11 @@ body[data-dash="floating"] #dashboard h2 {
 </div>
 
 <div id="dashboard">
-
-<h2>Control Dashboard</h2>
+    <!-- ⭐️ NEW: Add this close button -->
+    <button id="close-panel-btn">&times;</button>
+    
+    <h2>Control Dashboard</h2>
+    <!-- (Rest of your dashboard content...) -->
 
 <label><strong>Dashboard Layout</strong></label><br>
 <select onchange="setDashboardMode(this.value)">
