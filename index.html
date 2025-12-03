@@ -274,6 +274,22 @@ body[data-dash="floating"] #dashboard h2 {
     border-radius: 8px;
 }
 
+/* ⭐️ NEW: Style for music upload buttons */
+.music-btn {
+    display: inline-block;
+    background: #4a5568; /* A nice dark-bluish-gray */
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    margin: 2px;
+    transition: background 0.2s;
+}
+.music-btn:hover {
+    background: #2d3748;
+}
+    
 /* ⭐️ NEW: Styles for the Stream-Here-Placeholder */
 .stream-placeholder {
     width: 100%;
@@ -365,14 +381,26 @@ body[data-dash="floating"] #dashboard h2 {
 <div id="description-panel"></div>
 <div id="timeline"></div>
 
+<!-- ⭐️ REPLACE your entire #audio-player div with this ⭐️ -->
 <div id="audio-player">
     <strong>Music Playlist</strong><br>
 
+    <!-- Audio element -->
     <audio id="bgm" controls style="width: 100%; margin-top: 5px;"></audio><br><br>
 
-    <label>Add Music:</label>
-    <input type="file" id="music-upload" accept="audio/*" multiple style="width: 100%;"><br><br>
+    <!-- Upload Buttons -->
+    <label for="music-upload" class="music-btn">Add Music File(s)</label>
+    <input type="file" id="music-upload" accept="audio/*" multiple style="display:none;">
 
+    <label for="music-folder-upload" class="music-btn">Add Music Folder</label>
+    <input type="file" id="music-folder-upload" webkitdirectory multiple style="display:none;">
+
+    <label for="music-links-upload" class="music-btn">Add Links (.txt)</label>
+    <input type="file" id="music-links-upload" accept=".txt,text/plain" style="display:none;">
+    
+    <br><br>
+
+    <!-- Track list -->
     <div id="track-list" style="max-height:150px; overflow-y:auto; background: rgba(0,0,0,0.3); border-radius: 4px;"></div>
     <br>
     <button onclick="prevTrack()">Prev Track</button>
@@ -729,8 +757,29 @@ document.getElementById('files').onchange = e=>{
 // ⭐️ REMOVED: Duplicate 'musicList' and 'trackIndex' declarations
 
 /* ============================================================
-   MUSIC PLAYLIST ENGINE — (Phase 2 Ultra Upgrade)
+   MUSIC PLAYLIST ENGINE — (⭐️ NEW UPGRADED VERSION ⭐️)
 ============================================================ */
+
+// Helper: Adds a track to the list and auto-plays if needed
+function addTrackToPlaylist(name, url) {
+    musicList.push({ name: name, url: url });
+
+    // Auto-play if it's the first track
+    if (musicList.length === 1 && document.getElementById("bgm").paused) {
+        playCurrentTrack();
+    }
+}
+
+// Helper: Tries to get a nice name from a URL
+function getTrackNameFromUrl(url) {
+    try {
+        const path = new URL(url).pathname;
+        const filename = path.substring(path.lastIndexOf('/') + 1);
+        return decodeURIComponent(filename) || url; // Return decoded filename or the full URL
+    } catch (e) {
+        return url; // If it's not a valid URL, just return the string
+    }
+}
 
 /* Update track list visually */
 function refreshTrackList() {
@@ -743,7 +792,12 @@ function refreshTrackList() {
         div.style.cursor = "pointer";
         div.style.background = i === trackIndex ? "rgba(255,255,0,0.2)" : "transparent";
         div.style.borderBottom = "1px solid #444";
-        div.innerText = (i+1) + ". " + track.name;
+        
+        // Truncate long names for display
+        const displayName = track.name.length > 30 ? track.name.substring(0, 30) + "..." : track.name;
+        div.innerText = (i+1) + ". " + displayName;
+        div.title = track.name; // Show full name on hover
+        
         div.onclick = () => {
             trackIndex = i;
             playCurrentTrack();
@@ -756,7 +810,10 @@ function refreshTrackList() {
 /* Load and play the current track */
 function playCurrentTrack() {
     const audio = document.getElementById("bgm");
-    if (musicList.length === 0) return;
+    if (musicList.length === 0) {
+        audio.src = ""; // Clear the player
+        return;
+    }
 
     audio.src = musicList[trackIndex].url;
     audio.play();
@@ -780,23 +837,50 @@ function prevTrack() {
 /* Auto-next when a track ends */
 document.getElementById("bgm").onended = nextTrack;
 
-/* Upload music files */
+/* --- ⭐️ NEW: UPLOAD HANDLERS ⭐️ --- */
+
+// 1. Handle "Add Music File(s)" button
 document.getElementById("music-upload").onchange = (e) => {
     [...e.target.files].forEach(file => {
         if (file.type.startsWith("audio/")) {
             const url = URL.createObjectURL(file);
-            musicList.push({ name: file.name, url });
+            addTrackToPlaylist(file.name, url);
         }
     });
+    refreshTrackList(); // Refresh list after adding all files
+};
 
-    refreshTrackList();
-
-    // Auto-play first track if none playing
-    if (musicList.length > 0 && document.getElementById("bgm").paused) {
-        if (trackIndex === 0 && !document.getElementById("bgm").src) {
-             playCurrentTrack();
+// 2. Handle "Add Music Folder" button
+document.getElementById("music-folder-upload").onchange = (e) => {
+    const audioFileTypes = ["audio/mpeg", "audio/wav", "audio/ogg", "audio/mp4", "audio/aac"];
+    
+    [...e.target.files].forEach(file => {
+        // Check by file extension or type
+        if (file.type.startsWith("audio/") || file.name.match(/\.(mp3|wav|ogg|m4a|aac)$/i)) {
+            const url = URL.createObjectURL(file);
+            addTrackToPlaylist(file.name, url);
         }
-    }
+    });
+    refreshTrackList(); // Refresh list after adding all files
+};
+
+// 3. Handle "Add Links (.txt)" button
+document.getElementById("music-links-upload").onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        const text = ev.target.result;
+        const urls = text.split('\n').filter(line => line.trim().startsWith('http')); // Get all lines that start with http
+
+        urls.forEach(url => {
+            const name = getTrackNameFromUrl(url);
+            addTrackToPlaylist(name, url.trim());
+        });
+        refreshTrackList(); // Refresh list after adding all links
+    };
+    reader.readAsText(file);
 };
 
 /* ============================================================
